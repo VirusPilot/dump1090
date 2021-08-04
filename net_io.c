@@ -839,12 +839,14 @@ static void modesSendStratuxOutput(struct modesMessage *mm, struct aircraft *a) 
             "\"TypeCode\":%d,"
             "\"SubtypeCode\":%d,"
             "\"SignalLevel\":%f,"
+            "\"Gain\":%f,"
             "\"IsMlat\":%s,",
             mm->addr,
             mm->msgtype, cacf,
             mm->metype,
             mm->mesub,
             mm->signalLevel, // what precision and range is needed for RSSI?
+            sdrGetGainDb(sdrGetGain()),
             is_mlat_str);
 
     //// callsign
@@ -1126,7 +1128,7 @@ static int handleFaupCommand(struct client *c, char *p) {
 
     // Traverse through message for commands
     while (msg_field != NULL) {
-        if (strcmp(msg_field, "upload_rate_multiplier") == 0) {
+        if (!strcmp(msg_field, "upload_rate_multiplier")) {
             msg_field = strtok (NULL, "\t");
             multiplier = atof(msg_field);
 
@@ -1138,6 +1140,14 @@ static int handleFaupCommand(struct client *c, char *p) {
 
             fprintf(stderr, "handleFaupCommand(): Adjusting message rate to FlightAware by %0.2fx\n", multiplier);
             Modes.faup_rate_multiplier = multiplier;
+            break;
+        }
+
+        if (!strcmp(msg_field, "upload_unknown_commb")) {
+            msg_field = strtok (NULL, "\t");
+            unsigned enable = atoi(msg_field);
+            fprintf(stderr, "handleFaupCommand(): %s upload of unknown Comm-B messages\n", enable ? "Enabling" : "Disabling");
+            Modes.faup_upload_unknown_commb = enable;
             break;
         }
         msg_field = strtok (NULL, "\t");
@@ -1604,6 +1614,29 @@ static const char *nav_altitude_source_enum_string(nav_altitude_source_t src)
     }
 }
 
+static const char *mrar_source_enum_string(mrar_source_t src)
+{
+    switch (src) {
+    case MRAR_SOURCE_INVALID:  return "invalid";
+    case MRAR_SOURCE_INS:      return "ins";
+    case MRAR_SOURCE_GNSS:     return "gnss";
+    case MRAR_SOURCE_DMEDME:   return "dmedme";
+    case MRAR_SOURCE_VORDME:   return "vordme";
+    default:                   return "reserved";
+    }
+}
+
+static const char *hazard_enum_string(hazard_t hazard)
+{
+    switch (hazard) {
+    case HAZARD_NIL:       return "nil";
+    case HAZARD_LIGHT:     return "light";
+    case HAZARD_MODERATE:  return "moderate";
+    case HAZARD_SEVERE:    return "severe";
+    default:               return "invalid";
+    }
+}
+
 char *generateAircraftJson(const char *url_path, int *len) {
     uint64_t now = mstime();
     struct aircraft *a;
@@ -1707,11 +1740,22 @@ char *generateAircraftJson(const char *url_path, int *len) {
             p = safe_snprintf(p, end, ",\"gva\":%u", a->gva);
         if (trackDataValid(&a->sda_valid))
             p = safe_snprintf(p, end, ",\"sda\":%u", a->sda);
+        if (trackDataValid(&a->mrar_source_valid))
+            p = safe_snprintf(p, end, ",\"mrar_source\":\"%s\"", mrar_source_enum_string(a->mrar_source));
+        if (trackDataValid(&a->wind_valid))
+            p = safe_snprintf(p, end, ",\"wind_speed\":%.0f,\"wind_dir\":%.1f", a->wind_speed, a->wind_dir);
+        if (trackDataValid(&a->temperature_valid))
+            p = safe_snprintf(p, end, ",\"temperature\":%.2f", a->temperature);
+        if (trackDataValid(&a->pressure_valid))
+            p = safe_snprintf(p, end, ",\"pressure\":%.0f", a->pressure);
+        if (trackDataValid(&a->turbulence_valid))
+            p = safe_snprintf(p, end, ",\"turbulence\":\"%s\"", hazard_enum_string(a->turbulence));
+        if (trackDataValid(&a->humidity_valid))
+            p = safe_snprintf(p, end, ",\"humidity\":%.1f", a->humidity);
         if (a->modeA_hit)
             p = safe_snprintf(p, end, ",\"modea\":true");
         if (a->modeC_hit)
             p = safe_snprintf(p, end, ",\"modec\":true");
-
 
         p = safe_snprintf(p, end, ",\"mlat\":");
         p = append_flags(p, end, a, SOURCE_MLAT);
@@ -1993,6 +2037,30 @@ char *generateHistoryJson(const char *url_path, int *len)
     return strdup(Modes.json_aircraft_history[history_index].content);
 }
 
+static void ratelimitWriteError(const char *format, ...)
+{
+    static uint64_t lastError = 0;
+    static unsigned suppressed = 0;
+
+    uint64_t now = mstime();
+    if (now - lastError < 60000) {
+        ++suppressed;
+        return;
+    }
+
+    lastError = now;
+
+    va_list ap;
+    va_start(ap, format);
+    vfprintf(stderr, format, ap);
+    if (suppressed) {
+        fprintf(stderr, " (%u more error messages suppressed)", suppressed);
+        suppressed = 0;
+    }
+    fprintf(stderr, "\n");
+    va_end(ap);
+}
+
 // Write JSON to file
 void writeJsonToFile(const char *file, char * (*generator) (const char *,int*))
 {
@@ -2010,8 +2078,10 @@ void writeJsonToFile(const char *file, char * (*generator) (const char *,int*))
     snprintf(tmppath, PATH_MAX, "%s/%s.XXXXXX", Modes.json_dir, file);
     tmppath[PATH_MAX-1] = 0;
     fd = mkstemp(tmppath);
-    if (fd < 0)
+    if (fd < 0) {
+        ratelimitWriteError("failed to create %s (while updating %s/%s): %s", tmppath, Modes.json_dir, file, strerror(errno));
         return;
+    }
 
     mask = umask(0);
     umask(mask);
@@ -2021,15 +2091,23 @@ void writeJsonToFile(const char *file, char * (*generator) (const char *,int*))
     pathbuf[PATH_MAX-1] = 0;
     content = generator(pathbuf, &len);
 
-    if (write(fd, content, len) != len)
+    if (write(fd, content, len) != len) {
+        ratelimitWriteError("failed to write to %s (while updating %s/%s): %s", tmppath, Modes.json_dir, file, strerror(errno));
         goto error_1;
+    }
 
-    if (close(fd) < 0)
+    if (close(fd) < 0) {
+        ratelimitWriteError("failed to write to %s (while updating %s/%s): %s", tmppath, Modes.json_dir, file, strerror(errno));
         goto error_2;
+    }
 
     snprintf(pathbuf, PATH_MAX, "%s/%s", Modes.json_dir, file);
     pathbuf[PATH_MAX-1] = 0;
-    rename(tmppath, pathbuf);
+    if (rename(tmppath, pathbuf) < 0) {
+        ratelimitWriteError("failed to rename %s to %s: %s", tmppath, pathbuf, strerror(errno));
+        goto error_2;
+    }
+
     free(content);
     return;
 
@@ -2257,7 +2335,7 @@ __attribute__ ((format (printf,4,5))) static char *appendFATSV(char *p, char *en
 }
 
 #define TSV_MAX_PACKET_SIZE 800
-#define TSV_VERSION "8E"
+#define TSV_VERSION "9E"
 
 static void writeFATSVPositionUpdate(float lat, float lon, float alt)
 {
@@ -2349,6 +2427,23 @@ static void writeFATSVEvent(struct modesMessage *mm, struct aircraft *a)
             if (memcmp(mm->MB, a->fatsv_emitted_bds_30, 7) != 0) {
                 memcpy(a->fatsv_emitted_bds_30, mm->MB, 7);
                 writeFATSVEventMessage(mm, "commb_acas_ra", mm->MB, 7);
+            }
+            break;
+
+        case COMMB_GICB_CAPS:
+            // BDS 1,7: common usage GICB capability report
+            if (memcmp(mm->MB, a->fatsv_emitted_bds_17, 7) != 0) {
+                memcpy(a->fatsv_emitted_bds_17, mm->MB, 7);
+                writeFATSVEventMessage(mm, "gicb_caps", mm->MB, 7);
+            }
+            break;
+
+        case COMMB_UNKNOWN:
+            // If enabled, upload raw unrecognized Comm-B messages
+            // for server-side analysis
+            if (Modes.faup_upload_unknown_commb && memcmp(mm->MB, a->fatsv_emitted_unknown_commb, 7) != 0) {
+                memcpy(a->fatsv_emitted_unknown_commb, mm->MB, 7);
+                writeFATSVEventMessage(mm, "unknown_commb", mm->MB, 7);
             }
             break;
 
@@ -2526,7 +2621,13 @@ static void writeFATSV()
             (airgroundValid && a->airground == AG_AIRBORNE && a->fatsv_emitted_airground == AG_GROUND) ||
             (airgroundValid && a->airground == AG_GROUND && a->fatsv_emitted_airground == AG_AIRBORNE) ||
             (squawkValid && a->squawk != a->fatsv_emitted_squawk) ||
-            (trackDataValid(&a->emergency_valid) && a->emergency != a->fatsv_emitted_emergency);
+            (trackDataValid(&a->emergency_valid) && a->emergency != a->fatsv_emitted_emergency) ||
+            (trackDataValid(&a->mrar_source_valid) && a->mrar_source_valid.updated > a->fatsv_last_emitted) ||
+            (trackDataValid(&a->wind_valid) && a->wind_valid.updated > a->fatsv_last_emitted) ||
+            (trackDataValid(&a->pressure_valid) && a->pressure_valid.updated > a->fatsv_last_emitted) ||
+            (trackDataValid(&a->temperature_valid) && a->temperature_valid.updated > a->fatsv_last_emitted) ||
+            (trackDataValid(&a->turbulence_valid) && a->turbulence_valid.updated > a->fatsv_last_emitted) ||
+            (trackDataValid(&a->humidity_valid) && a->humidity_valid.updated > a->fatsv_last_emitted);
 
         uint64_t minAge;
         double adjustedMinAge;
@@ -2628,10 +2729,17 @@ static void writeFATSV()
         p = appendFATSVMeta(p, end, "nav_alt_mcp", a, &a->nav_altitude_mcp_valid, "%u",   a->nav_altitude_mcp);
         p = appendFATSVMeta(p, end, "nav_alt_fms", a, &a->nav_altitude_fms_valid, "%u",   a->nav_altitude_fms);
         p = appendFATSVMeta(p, end, "nav_alt_src", a, &a->nav_altitude_src_valid, "%s", nav_altitude_source_enum_string(a->nav_altitude_src));
-        p = appendFATSVMeta(p, end, "nav_heading", a, &a->nav_heading_valid,   "%.1f", a->nav_heading);
-        p = appendFATSVMeta(p, end, "nav_modes",   a, &a->nav_modes_valid,     "{%s}", nav_modes_flags_string(a->nav_modes));
-        p = appendFATSVMeta(p, end, "nav_qnh",     a, &a->nav_qnh_valid,       "%.1f", a->nav_qnh);
-        p = appendFATSVMeta(p, end, "emergency",   a, &a->emergency_valid,     "%s",   emergency_enum_string(a->emergency));
+        p = appendFATSVMeta(p, end, "nav_heading", a, &a->nav_heading_valid,    "%.1f", a->nav_heading);
+        p = appendFATSVMeta(p, end, "nav_modes",   a, &a->nav_modes_valid,      "{%s}", nav_modes_flags_string(a->nav_modes));
+        p = appendFATSVMeta(p, end, "nav_qnh",     a, &a->nav_qnh_valid,        "%.1f", a->nav_qnh);
+        p = appendFATSVMeta(p, end, "emergency",   a, &a->emergency_valid,      "%s",   emergency_enum_string(a->emergency));
+        p = appendFATSVMeta(p, end, "mrar_source", a, &a->mrar_source_valid,    "%s",   mrar_source_enum_string(a->mrar_source));
+        p = appendFATSVMeta(p, end, "wind_speed",  a, &a->wind_valid,           "%.0f", a->wind_speed);
+        p = appendFATSVMeta(p, end, "wind_dir",    a, &a->wind_valid,           "%.1f", a->wind_dir);
+        p = appendFATSVMeta(p, end, "temperature", a, &a->temperature_valid,    "%.2f", a->temperature);
+        p = appendFATSVMeta(p, end, "pressure",    a, &a->pressure_valid,       "%.0f", a->pressure);
+        p = appendFATSVMeta(p, end, "turbulence",  a, &a->turbulence_valid,     "%s",   hazard_enum_string(a->turbulence));
+        p = appendFATSVMeta(p, end, "humidity",    a, &a->humidity_valid,       "%.0f", a->humidity);
 
         // if we didn't get anything interesting, bail out.
         // We don't need to do anything special to unwind prepareWrite().

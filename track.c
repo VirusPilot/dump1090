@@ -130,6 +130,12 @@ static struct aircraft *trackCreateAircraft(struct modesMessage *mm) {
     F(sil,             60, 70);  // ADS-B only
     F(gva,             60, 70);  // ADS-B only
     F(sda,             60, 70);  // ADS-B only
+    F(mrar_source,     60, 70);  // Comm-B only
+    F(wind,            60, 70);  // Comm-B only
+    F(temperature,     60, 70);  // Comm-B only
+    F(pressure,        60, 70);  // Comm-B only
+    F(turbulence,      60, 70);  // Comm-B only
+    F(humidity,        60, 70);  // Comm-B only
 #undef F
 
     Modes.stats_current.unique_aircraft++;
@@ -1237,6 +1243,31 @@ struct aircraft *trackUpdateFromMessage(struct modesMessage *mm)
         a->sda = mm->accuracy.sda;
     }
 
+    if (mm->mrar_source_valid && accept_data(&a->mrar_source_valid, mm->source)) {
+        a->mrar_source = mm->mrar_source;
+    }
+
+    if (mm->wind_valid && accept_data(&a->wind_valid, mm->source)) {
+        a->wind_speed = mm->wind_speed;
+        a->wind_dir = mm->wind_dir;
+    }
+
+    if (mm->temperature_valid && accept_data(&a->temperature_valid, mm->source)) {
+        a->temperature = mm->temperature;
+    }
+
+    if (mm->pressure_valid && accept_data(&a->pressure_valid, mm->source)) {
+        a->pressure = mm->pressure;
+    }
+
+    if (mm->turbulence_valid && accept_data(&a->turbulence_valid, mm->source)) {
+        a->turbulence = mm->turbulence;
+    }
+
+    if (mm->humidity_valid && accept_data(&a->humidity_valid, mm->source)) {
+        a->humidity = mm->humidity;
+    }
+
     // Now handle derived data
 
     // derive geometric altitude if we have baro + delta
@@ -1400,6 +1431,12 @@ static void trackRemoveStaleAircraft(uint64_t now)
             EXPIRE(sil);
             EXPIRE(gva);
             EXPIRE(sda);
+            EXPIRE(mrar_source);
+            EXPIRE(wind);
+            EXPIRE(temperature);
+            EXPIRE(pressure);
+            EXPIRE(turbulence);
+            EXPIRE(humidity);
 #undef EXPIRE
             prev = a; a = a->next;
         }

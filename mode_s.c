@@ -1681,6 +1681,8 @@ static const char *commb_format_to_string(commb_format_t format) {
         return "empty response";
     case COMMB_AMBIGUOUS:
         return "ambiguous format";
+    case COMMB_NOT_DECODED:
+        return "not decoded";
     case COMMB_DATALINK_CAPS:
         return "BDS1,0 Datalink capabilities";
     case COMMB_GICB_CAPS:
@@ -1695,6 +1697,10 @@ static const char *commb_format_to_string(commb_format_t format) {
         return "BDS5,0 Track and turn report";
     case COMMB_HEADING_SPEED:
         return "BDS6,0 Heading and speed report";
+    case COMMB_MRAR:
+        return "BDS4,4 Meterological routine air report";
+    case COMMB_AIRBORNE_POSITION:
+        return "BDS0,5 Extended squitter airborne position";
     default:
         return "unknown format";
     }
@@ -1745,6 +1751,29 @@ static const char *emergency_to_string(emergency_t emergency)
     case EMERGENCY_UNLAWFUL:  return "unlawful interference (7500)";
     case EMERGENCY_DOWNED:    return "downed aircraft";
     default:                  return "reserved";
+    }
+}
+
+static const char *mrar_source_to_string(mrar_source_t source)
+{
+    switch (source) {
+    case MRAR_SOURCE_INVALID: return "invalid";
+    case MRAR_SOURCE_INS:     return "INS";
+    case MRAR_SOURCE_GNSS:    return "GNSS";
+    case MRAR_SOURCE_DMEDME:  return "DME/DME";
+    case MRAR_SOURCE_VORDME:  return "VOR/DME";
+    default:                  return "reserved";
+    }
+}
+
+static const char *hazard_to_string(hazard_t hazard)
+{
+    switch (hazard) {
+    case HAZARD_NIL:      return "nil";
+    case HAZARD_LIGHT:    return "light";
+    case HAZARD_MODERATE: return "moderate";
+    case HAZARD_SEVERE:   return "severe";
+    default:              return "invalid hazard severity";
     }
 }
 
@@ -2212,6 +2241,21 @@ void displayModesMessage(struct modesMessage *mm) {
     if (mm->emergency_valid) {
         printf("  Emergency/priority:      %s\n", emergency_to_string(mm->emergency));
     }
+
+    if (mm->mrar_source_valid)
+        printf("  MRAR FOM/Source:         %s\n", mrar_source_to_string(mm->mrar_source));
+    if (mm->wind_valid) {
+        printf("  Wind speed:              %.0f kt\n", mm->wind_speed);
+        printf("  Wind direction:          %.1f degrees\n", mm->wind_dir);
+    }
+    if (mm->temperature_valid)
+        printf("  Air temperature:         %.1f degrees C\n", mm->temperature);
+    if (mm->pressure_valid)
+        printf("  Static pressure:         %.0f hPa\n", mm->pressure);
+    if (mm->turbulence_valid)
+        printf("  Turbulence:              %s\n", hazard_to_string(mm->turbulence));
+    if (mm->humidity_valid)
+        printf("  Humidity:                %.0f%%\n", mm->humidity);
 
     printf("\n");
     fflush(stdout);
