@@ -1,5 +1,6 @@
 #include <math.h>
-#include <endian.h>
+
+#include "compat/compat.h"
 
 /* Convert (little-endian) SC16 values to unsigned 16-bit magnitudes */
 

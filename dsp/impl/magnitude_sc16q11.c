@@ -1,5 +1,6 @@
 #include <math.h>
-#include <endian.h>
+
+#include "compat/compat.h"
 
 #include "dsp/helpers/tables.h"
 

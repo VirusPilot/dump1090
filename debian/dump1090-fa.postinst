@@ -63,6 +63,17 @@ case "$1" in
             fi
         fi
 
+        # on upgrade from pre-6.0, update the defaults file to the new syntax
+        if dpkg --compare-versions "$2" lt-nl "6.0"
+        then
+            if [ -f /etc/default/dump1090-fa ]
+            then
+                echo "Trying to upgrade existing config to new syntax.." >&2
+                /usr/share/dump1090-fa/upgrade-config /etc/default/dump1090-fa /usr/share/dump1090-fa/dump1090-fa.default \
+                    || echo "Something went wrong upgrading the config; your config may be broken. Sorry!" >&1
+            fi
+        fi
+
         if dpkg --compare-versions "$2" le "5.0"
         then
             echo "Enabling lighttpd skyaware module.." >&2

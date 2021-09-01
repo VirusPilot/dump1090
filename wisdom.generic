@@ -14,3 +14,6 @@ magnitude_uc8_aligned                    lookup_unroll_4_generic
 
 mean_power_u16                           u32_generic
 mean_power_u16_aligned                   u32_generic
+
+count_above_u16                          generic_generic
+count_above_u16_aligned                  generic_generic

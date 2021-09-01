@@ -247,7 +247,9 @@ static bool isShortPIMessage(const unsigned char *msg)
     return (df == 11); // assume IID==0
 }
 
-static int correctMessage(const unsigned char *in, unsigned char *out)
+#define UNCHECKED_SYNDROME 0xFFFFFFFFU
+
+static int correctMessage(const unsigned char *in, unsigned char *out, uint32_t *short_syndrome, uint32_t *long_syndrome)
 {
     // Possible DF values of the first byte of a message that could be a valid DF11/17/18
     // message after correction. See tools/df-correction-arrays.py for generator code.
@@ -262,6 +264,9 @@ static int correctMessage(const unsigned char *in, unsigned char *out)
         0x00060000, 0x066f0006, 0x6fff066f
     };
 
+    *short_syndrome = UNCHECKED_SYNDROME;
+    *long_syndrome = UNCHECKED_SYNDROME;
+
     // Try to correct, including corrections to the initial 5 bit DF field
     // that determines message format
 
@@ -275,27 +280,27 @@ static int correctMessage(const unsigned char *in, unsigned char *out)
 
     struct errorinfo *long_ei = NULL;
     if (df_correctable_long[fix_df_bits] & df_bit) {
-        uint32_t long_syndrome = modesChecksum(in, MODES_LONG_MSG_BITS);
-        if (isLongPIMessage(in) && long_syndrome == 0) {
+        *long_syndrome = modesChecksum(in, MODES_LONG_MSG_BITS);
+        if (isLongPIMessage(in) && *long_syndrome == 0) {
             // DF17/18 message with correct checksum
             memcpy(out, in, MODES_LONG_MSG_BYTES);
             return 0;
         }
 
-        long_ei = modesChecksumDiagnose(long_syndrome, MODES_LONG_MSG_BITS);
+        long_ei = modesChecksumDiagnose(*long_syndrome, MODES_LONG_MSG_BITS);
     }
 
     struct errorinfo *short_ei = NULL;
     if (df_correctable_short[fix_df_bits] & df_bit) {
-        uint32_t short_syndrome = modesChecksum(in, MODES_SHORT_MSG_BITS);
-        if (isShortPIMessage(in) && (short_syndrome & 0xFFFF80) == 0) {
+        *short_syndrome = modesChecksum(in, MODES_SHORT_MSG_BITS);
+        if (isShortPIMessage(in) && (*short_syndrome & 0xFFFF80) == 0) {
             // DF11 message with correct checksum
             // (low 7 bits may be IID)
             memcpy(out, in, MODES_SHORT_MSG_BYTES);
             return 0;
         }
 
-        short_ei = modesChecksumDiagnose(short_syndrome, MODES_SHORT_MSG_BITS); // assume IID == 0
+        short_ei = modesChecksumDiagnose(*short_syndrome, MODES_SHORT_MSG_BITS); // assume IID == 0
     }
 
     // Might be a damaged DF11/17/18, or might be another message type that doesn't have a full CRC
@@ -344,14 +349,15 @@ static int correctMessage(const unsigned char *in, unsigned char *out)
 // The more positive, the more reliable the message is.
 score_rank scoreModesMessage(const unsigned char *uncorrected)
 {
-    // try to produce a corrected DF11/17/18, including correcting the DF bits
-    unsigned char corrected[14];
-    int corrections = correctMessage(uncorrected, corrected);
-
     // This is a "valid" DF0 message, but it's not useful; we discard these messages
     static const unsigned char all_zeros[MODES_SHORT_MSG_BYTES] = { 0, 0, 0, 0, 0, 0, 0 };
-    if (!memcmp(all_zeros, corrected, sizeof(all_zeros)))
+    if (!memcmp(all_zeros, uncorrected, sizeof(all_zeros)))
         return SR_ALL_ZEROS;
+
+    // try to produce a corrected DF11/17/18, including correcting the DF bits
+    unsigned char corrected[14];
+    uint32_t short_syndrome, long_syndrome;
+    int corrections = correctMessage(uncorrected, corrected, &short_syndrome, &long_syndrome);
 
     unsigned df = getbits(corrected, 1, 5); // Downlink Format
     switch (df) {
@@ -359,14 +365,22 @@ score_rank scoreModesMessage(const unsigned char *uncorrected)
     case 4:  // surveillance, altitude reply
     case 5:  // surveillance, altitude reply
         {
-            uint32_t addr = modesChecksum(corrected, MODES_SHORT_MSG_BITS);
-            bool recent = icaoFilterTest(addr);
+            if (short_syndrome == UNCHECKED_SYNDROME)
+                short_syndrome = modesChecksum(corrected, MODES_SHORT_MSG_BITS);
+            bool recent = icaoFilterTest(short_syndrome);
             return recent ? SR_UNRELIABLE_KNOWN : SR_UNRELIABLE_UNKNOWN;
         }
 
     case 16: // long air-air surveillance
     case 20: // Comm-B, altitude reply
     case 21: // Comm-B, identity reply
+        {
+            if (long_syndrome == UNCHECKED_SYNDROME)
+                long_syndrome = modesChecksum(corrected, MODES_LONG_MSG_BITS);
+            bool recent = icaoFilterTest(long_syndrome);
+            return recent ? SR_UNRELIABLE_KNOWN : SR_UNRELIABLE_UNKNOWN;
+        }
+
     case 24: // Comm-D (ELM)
     case 25: // Comm-D (ELM)
     case 26: // Comm-D (ELM)
@@ -376,8 +390,11 @@ score_rank scoreModesMessage(const unsigned char *uncorrected)
     case 30: // Comm-D (ELM)
     case 31: // Comm-D (ELM)
         {
-            uint32_t addr = modesChecksum(corrected, MODES_LONG_MSG_BITS);
-            bool recent = icaoFilterTest(addr);
+            if (!Modes.enable_df24)
+                return SR_UNCORRECTABLE;
+            if (long_syndrome == UNCHECKED_SYNDROME)
+                long_syndrome = modesChecksum(corrected, MODES_LONG_MSG_BITS);
+            bool recent = icaoFilterTest(long_syndrome);
             return recent ? SR_UNRELIABLE_KNOWN : SR_UNRELIABLE_UNKNOWN;
         }
 
@@ -385,7 +402,9 @@ score_rank scoreModesMessage(const unsigned char *uncorrected)
         {
             // DF11 All-call reply
             uint32_t addr = getbits(corrected, 9, 32);
-            uint32_t iid = modesChecksum(corrected, MODES_SHORT_MSG_BITS) & 0x7F;
+            if (short_syndrome == UNCHECKED_SYNDROME)
+                short_syndrome = modesChecksum(corrected, MODES_SHORT_MSG_BITS);
+            uint32_t iid = short_syndrome & 0x7F;
             bool recent = icaoFilterTest(addr);
 
             switch (corrections) {
@@ -513,13 +532,23 @@ int decodeModesMessage(struct modesMessage *mm, const unsigned char *in)
     memcpy(mm->verbatim, in, MODES_LONG_MSG_BYTES);
 
     // Apply corrections to our local copy
-    int corrections = correctMessage(in, mm->msg);
+    uint32_t short_syndrome, long_syndrome;
+    int corrections = correctMessage(in, mm->msg, &short_syndrome, &long_syndrome);
     const unsigned char *msg = mm->msg;
 
     // Get the message type ASAP as other operations depend on this
     mm->msgtype         = getbits(msg, 1, 5); // Downlink Format
     mm->msgbits         = modesMessageLenByType(mm->msgtype);
-    mm->crc             = modesChecksum(msg, mm->msgbits);
+    if (mm->msgtype & 16) {
+        if (long_syndrome == UNCHECKED_SYNDROME)
+            long_syndrome = modesChecksum(mm->msg, MODES_LONG_MSG_BITS);
+        mm->crc = long_syndrome;
+    } else {
+        if (short_syndrome == UNCHECKED_SYNDROME)
+            short_syndrome = modesChecksum(mm->msg, MODES_SHORT_MSG_BITS);
+        mm->crc = short_syndrome;
+    }
+
     mm->correctedbits   = corrections > 0 ? corrections : 0;
     mm->addr            = 0;
 
@@ -1652,6 +1681,8 @@ static const char *commb_format_to_string(commb_format_t format) {
         return "empty response";
     case COMMB_AMBIGUOUS:
         return "ambiguous format";
+    case COMMB_NOT_DECODED:
+        return "not decoded";
     case COMMB_DATALINK_CAPS:
         return "BDS1,0 Datalink capabilities";
     case COMMB_GICB_CAPS:
@@ -1666,6 +1697,10 @@ static const char *commb_format_to_string(commb_format_t format) {
         return "BDS5,0 Track and turn report";
     case COMMB_HEADING_SPEED:
         return "BDS6,0 Heading and speed report";
+    case COMMB_MRAR:
+        return "BDS4,4 Meterological routine air report";
+    case COMMB_AIRBORNE_POSITION:
+        return "BDS0,5 Extended squitter airborne position";
     default:
         return "unknown format";
     }
@@ -1716,6 +1751,29 @@ static const char *emergency_to_string(emergency_t emergency)
     case EMERGENCY_UNLAWFUL:  return "unlawful interference (7500)";
     case EMERGENCY_DOWNED:    return "downed aircraft";
     default:                  return "reserved";
+    }
+}
+
+static const char *mrar_source_to_string(mrar_source_t source)
+{
+    switch (source) {
+    case MRAR_SOURCE_INVALID: return "invalid";
+    case MRAR_SOURCE_INS:     return "INS";
+    case MRAR_SOURCE_GNSS:    return "GNSS";
+    case MRAR_SOURCE_DMEDME:  return "DME/DME";
+    case MRAR_SOURCE_VORDME:  return "VOR/DME";
+    default:                  return "reserved";
+    }
+}
+
+static const char *hazard_to_string(hazard_t hazard)
+{
+    switch (hazard) {
+    case HAZARD_NIL:      return "nil";
+    case HAZARD_LIGHT:    return "light";
+    case HAZARD_MODERATE: return "moderate";
+    case HAZARD_SEVERE:   return "severe";
+    default:              return "invalid hazard severity";
     }
 }
 
@@ -2183,6 +2241,21 @@ void displayModesMessage(struct modesMessage *mm) {
     if (mm->emergency_valid) {
         printf("  Emergency/priority:      %s\n", emergency_to_string(mm->emergency));
     }
+
+    if (mm->mrar_source_valid)
+        printf("  MRAR FOM/Source:         %s\n", mrar_source_to_string(mm->mrar_source));
+    if (mm->wind_valid) {
+        printf("  Wind speed:              %.0f kt\n", mm->wind_speed);
+        printf("  Wind direction:          %.1f degrees\n", mm->wind_dir);
+    }
+    if (mm->temperature_valid)
+        printf("  Air temperature:         %.1f degrees C\n", mm->temperature);
+    if (mm->pressure_valid)
+        printf("  Static pressure:         %.0f hPa\n", mm->pressure);
+    if (mm->turbulence_valid)
+        printf("  Turbulence:              %s\n", hazard_to_string(mm->turbulence));
+    if (mm->humidity_valid)
+        printf("  Humidity:                %.0f%%\n", mm->humidity);
 
     printf("\n");
     fflush(stdout);

@@ -107,8 +107,11 @@ ifeq ($(RTLSDR), yes)
     # some packaged .pc files are massively broken, try to handle it
 
     # FreeBSD's librtlsdr.pc includes -std=gnu89 in cflags
+    # some linux librtlsdr packages return a bare -I/ with no path in --cflags
     RTLSDR_CFLAGS := $(shell pkg-config --cflags librtlsdr)
-    CFLAGS += $(filter-out -std=%,$(RTLSDR_CFLAGS))
+    RTLSDR_CFLAGS := $(filter-out -std=%,$(RTLSDR_CFLAGS))
+    RTLSDR_CFLAGS := $(filter-out -I/,$(RTLSDR_CFLAGS))
+    CFLAGS += $(RTLSDR_CFLAGS)
 
     # some linux librtlsdr packages return a bare -L with no path in --libs
     # which horribly confuses things because it eats the next option on the command line
@@ -186,13 +189,13 @@ showconfig:
 %.o: %.c *.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-dump1090: dump1090.o anet.o interactive.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o demod_2400.o stats.o cpr.o icao_filter.o track.o util.o convert.o ais_charset.o $(SDR_OBJ) $(COMPAT) $(CPUFEATURES_OBJS) $(STARCH_OBJS)
+dump1090: dump1090.o anet.o interactive.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o demod_2400.o stats.o cpr.o icao_filter.o track.o util.o convert.o ais_charset.o adaptive.o $(SDR_OBJ) $(COMPAT) $(CPUFEATURES_OBJS) $(STARCH_OBJS)
 	$(CC) -g -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBS_SDR) $(LIBS_CURSES)
 
-view1090: view1090.o anet.o interactive.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o stats.o cpr.o icao_filter.o track.o util.o ais_charset.o $(COMPAT)
+view1090: view1090.o anet.o interactive.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o stats.o cpr.o icao_filter.o track.o util.o ais_charset.o sdr_stub.o $(COMPAT)
 	$(CC) -g -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBS_CURSES)
 
-faup1090: faup1090.o anet.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o stats.o cpr.o icao_filter.o track.o util.o ais_charset.o $(COMPAT)
+faup1090: faup1090.o anet.o mode_ac.o mode_s.o comm_b.o net_io.o crc.o stats.o cpr.o icao_filter.o track.o util.o ais_charset.o sdr_stub.o $(COMPAT)
 	$(CC) -g -o $@ $^ $(LDFLAGS) $(LIBS)
 
 starch-benchmark: cpu.o dsp/helpers/tables.o $(CPUFEATURES_OBJS) $(STARCH_OBJS) $(STARCH_BENCHMARK_OBJ)

@@ -105,3 +105,13 @@ mean_power_u16_aligned                   float_armv7a_neon_vfpv4                
 mean_power_u16_aligned                   u64_generic                               # 131637 ns/call
 mean_power_u16_aligned                   u32_generic                               # 132092 ns/call
 mean_power_u16_aligned                   float_generic                             # 187127 ns/call
+
+count_above_u16                          neon_armv7a_neon_vfpv4                    # 35 ns/call
+count_above_u16                          generic_armv7a_neon_vfpv4                 # 56 ns/call
+count_above_u16                          generic_generic                           # 178 ns/call
+
+count_above_u16_aligned                  neon_armv7a_neon_vfpv4_aligned            # 34 ns/call
+count_above_u16_aligned                  neon_armv7a_neon_vfpv4                    # 34 ns/call
+count_above_u16_aligned                  generic_armv7a_neon_vfpv4_aligned         # 53 ns/call
+count_above_u16_aligned                  generic_armv7a_neon_vfpv4                 # 53 ns/call
+count_above_u16_aligned                  generic_generic                           # 179 ns/call

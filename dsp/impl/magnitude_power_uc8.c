@@ -1,9 +1,10 @@
 #include <math.h>
-#include <endian.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdalign.h>
 #include <inttypes.h>
+
+#include "compat/compat.h"
 
 #include "dsp/helpers/tables.h"
 

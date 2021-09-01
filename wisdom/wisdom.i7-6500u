@@ -88,3 +88,10 @@ mean_power_u16_aligned                   u64_x86_avx2_aligned                   
 mean_power_u16_aligned                   u64_x86_avx2                              # 31283 ns/call
 mean_power_u16_aligned                   u64_generic                               # 39639 ns/call
 mean_power_u16_aligned                   float_generic                             # 105615 ns/call
+
+count_above_u16                          generic_x86_avx2                          # 20 ns/call
+count_above_u16                          generic_generic                           # 30 ns/call
+
+count_above_u16_aligned                  generic_x86_avx2_aligned                  # 15 ns/call
+count_above_u16_aligned                  generic_x86_avx2                          # 19 ns/call
+count_above_u16_aligned                  generic_generic                           # 31 ns/call

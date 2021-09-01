@@ -16,6 +16,6 @@ typedef union {
 typedef struct {
     int16_t I;
     int16_t Q;
-} __attribute__((__packed__)) sc16_t;
+} __attribute__((__packed__, __aligned__(2))) sc16_t;
 
 #endif

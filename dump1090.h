@@ -92,8 +92,8 @@
 #define MODES_RTL_BUF_SIZE         (16*16384)                 // 256k
 #define MODES_MAG_BUF_SAMPLES      (MODES_RTL_BUF_SIZE / 2)   // Each sample is 2 bytes
 #define MODES_MAG_BUFFERS          12                         // Number of magnitude buffers (should be smaller than RTL_BUFFERS for flowcontrol to work)
-#define MODES_AUTO_GAIN            -100                       // Use automatic gain
-#define MODES_MAX_GAIN             999999                     // Use max available gain
+#define MODES_LEGACY_AUTO_GAIN     -10                        // old gain value for "use automatic gain"
+#define MODES_DEFAULT_GAIN         999999                     // Use default SDR gain
 #define MODES_MSG_SQUELCH_DB       4.0                        // Minimum SNR, in dB
 #define MODES_MSG_ENCODER_ERRS     3                          // Maximum number of encoding errors
 
@@ -202,6 +202,7 @@ typedef enum {
 typedef enum {
     COMMB_UNKNOWN,
     COMMB_AMBIGUOUS,
+    COMMB_NOT_DECODED,
     COMMB_EMPTY_RESPONSE,
     COMMB_DATALINK_CAPS,
     COMMB_GICB_CAPS,
@@ -209,7 +210,9 @@ typedef enum {
     COMMB_ACAS_RA,
     COMMB_VERTICAL_INTENT,
     COMMB_TRACK_TURN,
-    COMMB_HEADING_SPEED
+    COMMB_HEADING_SPEED,
+    COMMB_MRAR,
+    COMMB_AIRBORNE_POSITION
 } commb_format_t;
 
 typedef enum {
@@ -236,6 +239,24 @@ typedef enum {
 typedef enum {
     NAV_ALT_INVALID, NAV_ALT_UNKNOWN, NAV_ALT_AIRCRAFT, NAV_ALT_MCP, NAV_ALT_FMS
 } nav_altitude_source_t;
+
+// BDS4,4 MRAR - FOM/Source values
+typedef enum {
+   MRAR_SOURCE_INVALID = 0,
+   MRAR_SOURCE_INS = 1,
+   MRAR_SOURCE_GNSS = 2,
+   MRAR_SOURCE_DMEDME = 3,
+   MRAR_SOURCE_VORDME = 4,
+   MRAR_SOURCE_RESERVED = 5
+} mrar_source_t;
+
+// BDS4,4 and BDS4,5 hazard reports
+typedef enum {
+   HAZARD_NIL = 0,
+   HAZARD_LIGHT = 1,
+   HAZARD_MODERATE = 2,
+   HAZARD_SEVERE = 3
+} hazard_t;
 
 #define MODES_NON_ICAO_ADDRESS       (1<<24) // Set on addresses to indicate they are not ICAO addresses
 
@@ -272,6 +293,7 @@ typedef enum {
 #include "convert.h"
 #include "sdr.h"
 #include "fifo.h"
+#include "adaptive.h"
 
 //======================== structure declarations =========================
 
@@ -296,9 +318,9 @@ struct _Modes {                             // Internal state
     // Sample conversion
     int            dc_filter;        // should we apply a DC filter?
 
-    // RTLSDR
+    // RTLSDR and some other SDRs
     char *        dev_name;
-    int           gain;
+    float         gain;              // value in dB, or MODES_AUTO_GAIN, or MODES_MAX_GAIN
     int           freq;
 
     // Networking
@@ -325,6 +347,7 @@ struct _Modes {                             // Internal state
     int   nfix_crc;                  // Number of crc bit error(s) to correct
     int   check_crc;                 // Only display messages with good CRC
     int   fix_df;                    // Try to correct damage to the DF field, as well as the main message body
+    int   enable_df24;               // Enable decoding of DF24..DF31 (Comm-D ELM)
     int   raw;                       // Raw output format
     int   mode_ac;                   // Enable decoding of SSR Modes A & C
     int   mode_ac_auto;              // allow toggling of A/C by Beast commands
@@ -362,6 +385,7 @@ struct _Modes {                             // Internal state
     uint64_t json_stats_interval;    // Interval between rewriting the json stats file, in milliseconds
     int   json_location_accuracy;    // Accuracy of location metadata: 0=none, 1=approx, 2=exact
     double faup_rate_multiplier;     // Multiplier to adjust rate of faup1090 messages emitted
+    bool faup_upload_unknown_commb;  // faup1090: should we upload Comm-B messages that weren't in a recognized format?
 
     int   json_aircraft_history_next;
     struct {
@@ -387,6 +411,27 @@ struct _Modes {                             // Internal state
     int stats_newest_1min;          // Index into stats_1min of the most recent 1-minute window
     struct stats stats_5min;        // Accumulated stats from the last 5 complete 1-minute windows
     struct stats stats_15min;       // Accumulated stats from the last 15 complete 1-minute windows
+
+    // Adaptive gain config
+    float adaptive_min_gain_db;
+    float adaptive_max_gain_db;
+
+    float adaptive_duty_cycle;
+
+    bool adaptive_burst_control;
+    float adaptive_burst_alpha;
+    unsigned adaptive_burst_change_delay;
+    float adaptive_burst_loud_rate;
+    unsigned adaptive_burst_loud_runlength;
+    float adaptive_burst_quiet_rate;
+    unsigned adaptive_burst_quiet_runlength;
+
+    bool adaptive_range_control;
+    float adaptive_range_alpha;
+    unsigned adaptive_range_percentile;
+    float adaptive_range_target;
+    unsigned adaptive_range_change_delay;
+    unsigned adaptive_range_rescan_delay;
 };
 
 extern struct _Modes Modes;
@@ -588,6 +633,22 @@ struct modesMessage {
 
         nav_modes_t modes;
     } nav;
+
+    // BDS 4,4 MRAR
+    unsigned mrar_source_valid : 1;
+    unsigned wind_valid : 1;
+    unsigned temperature_valid : 1;
+    unsigned pressure_valid : 1;
+    unsigned turbulence_valid : 1;
+    unsigned humidity_valid : 1;
+
+    mrar_source_t mrar_source;
+    float wind_speed;    // kts
+    float wind_dir;      // degrees
+    float temperature;   // degrees C
+    float pressure;      // hPa
+    hazard_t turbulence; // NIL/LIGHT/MODERATE/SEVERE
+    float humidity;      // 0-100 %
 };
 
 // This one needs modesMessage:

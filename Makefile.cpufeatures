@@ -17,7 +17,11 @@ ifeq ($(CPUFEATURES_UNAME),Darwin)
   CPUFEATURES_CFLAGS += -DHAVE_SYSCTLBYNAME
 endif
 
-ifeq ($(CPUFEATURES_ARCH), x86_64)
+ifeq ($(CPUFEATURES_ARCH),x86_64)
+  CPUFEATURES_OBJS += cpu_features/src/cpuinfo_x86.o
+endif
+
+ifneq (,$(filter i%86,$(CPUFEATURES_ARCH)))
   CPUFEATURES_OBJS += cpu_features/src/cpuinfo_x86.o
 endif
 

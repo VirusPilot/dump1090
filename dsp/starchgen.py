@@ -20,6 +20,7 @@ gen.add_function(name = 'magnitude_power_uc8', argtypes = ['const uc8_t *', 'uin
 gen.add_function(name = 'magnitude_sc16', argtypes = ['const sc16_t *', 'uint16_t *', 'unsigned'], aligned = True)
 gen.add_function(name = 'magnitude_sc16q11', argtypes = ['const sc16_t *', 'uint16_t *', 'unsigned'], aligned = True)
 gen.add_function(name = 'mean_power_u16', argtypes = ['const uint16_t *', 'unsigned', 'double *', 'double *'], aligned = True)
+gen.add_function(name = 'count_above_u16', argtypes = ['const uint16_t *', 'unsigned', 'uint16_t', 'unsigned *'], aligned = True)
 
 gen.add_feature(name='neon', description='ARM NEON')
 

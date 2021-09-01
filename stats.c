@@ -3,6 +3,7 @@
 // stats.c: statistics helpers.
 //
 // Copyright (c) 2015 Oliver Jowett <oliver@mutability.co.uk>
+// Copyright (c) 2021 FlightAware LLC
 //
 // This file is free software: you may copy, redistribute and/or modify it
 // under the terms of the GNU General Public License as published by the
@@ -114,6 +115,47 @@ void display_stats(struct stats *st) {
                st->strong_signal_count);
     }
 
+    if (st->adaptive_valid) {
+        printf("Adaptive gain:\n"
+               "  %5u loud undecoded bursts\n"
+               "  %5u loud decoded messages\n"
+               "  %5.1f dBFS current noise floor\n"
+               "  %5.1f dB current gain setting\n"
+               "  %5.1f dB current dynamic range gain upper limit\n"
+               "  %5u gain changes caused by adaptive gain control\n",
+               st->adaptive_loud_undecoded,
+               st->adaptive_loud_decoded,
+               st->adaptive_noise_dbfs,
+               sdrGetGainDb(st->adaptive_gain),
+               sdrGetGainDb(st->adaptive_range_gain_limit),
+               st->adaptive_gain_changes);
+
+        uint32_t total_seconds = 0;
+        for (unsigned i = 0; i < STATS_GAIN_COUNT; ++i)
+            total_seconds += st->adaptive_gain_seconds[i];
+
+        if (total_seconds) {
+            unsigned count = 0;
+            for (unsigned i = 0; i < STATS_GAIN_COUNT; ++i) {
+                count += st->adaptive_gain_seconds[i];
+                if (count >= total_seconds/2) {
+                    printf("  %5.1f dB median gain\n", sdrGetGainDb(i));
+                    break;
+                }
+            }
+
+            printf("  Gain histogram:\n");
+            for (unsigned i = 0; i < STATS_GAIN_COUNT; ++i) {
+                unsigned seconds = st->adaptive_gain_seconds[i];
+                if (seconds) {
+                    printf("    %5.1f dB: %5u seconds (%5.1f%%)\n",
+                           sdrGetGainDb(i), seconds, 100.0 * seconds / total_seconds);
+                }
+            }
+
+        }
+    }
+
     if (Modes.net) {
         printf("Messages from network clients:\n");
         printf("  %8u Mode A/C messages received\n",               st->remote_received_modeac);
@@ -125,28 +167,29 @@ void display_stats(struct stats *st) {
             printf("    %8u accepted with %d-bit error repaired\n", st->remote_accepted[j], j);
     }
 
-    printf("%8u total usable messages\n",
+    printf("Decoder:\n"
+           "  %8u total usable messages\n",
            st->messages_total);
 
     for (unsigned i = 0; i < 32; ++i) {
         if (st->messages_by_df[i])
-            printf("  %8u DF%u messages\n", st->messages_by_df[i], i);
+            printf("    %8u DF%u messages\n", st->messages_by_df[i], i);
     }
 
-    printf("%8u surface position messages received\n"
-           "%8u airborne position messages received\n"
-           "%8u global CPR attempts with valid positions\n"
-           "%8u global CPR attempts with bad data\n"
-           "  %8u global CPR attempts that failed the range check\n"
-           "  %8u global CPR attempts that failed the speed check\n"
-           "%8u global CPR attempts with insufficient data\n"
-           "%8u local CPR attempts with valid positions\n"
-           "  %8u aircraft-relative positions\n"
-           "  %8u receiver-relative positions\n"
-           "%8u local CPR attempts that did not produce useful positions\n"
-           "  %8u local CPR attempts that failed the range check\n"
-           "  %8u local CPR attempts that failed the speed check\n"
-           "%8u CPR messages that look like transponder failures filtered\n",
+    printf("  %8u surface position messages received\n"
+           "  %8u airborne position messages received\n"
+           "  %8u global CPR attempts with valid positions\n"
+           "  %8u global CPR attempts with bad data\n"
+           "    %8u global CPR attempts that failed the range check\n"
+           "    %8u global CPR attempts that failed the speed check\n"
+           "  %8u global CPR attempts with insufficient data\n"
+           "  %8u local CPR attempts with valid positions\n"
+           "    %8u aircraft-relative positions\n"
+           "    %8u receiver-relative positions\n"
+           "  %8u local CPR attempts that did not produce useful positions\n"
+           "    %8u local CPR attempts that failed the range check\n"
+           "    %8u local CPR attempts that failed the speed check\n"
+           "  %8u CPR messages that look like transponder failures filtered\n",
            st->cpr_surface,
            st->cpr_airborne,
            st->cpr_global_ok,
@@ -162,10 +205,10 @@ void display_stats(struct stats *st) {
            st->cpr_local_speed_checks,
            st->cpr_filtered);
 
-    printf("%8u non-ES altitude messages from ES-equipped aircraft ignored\n", st->suppressed_altitude_messages);
-    printf("%8u unique aircraft tracks\n", st->unique_aircraft);
-    printf("%8u aircraft tracks where only one message was seen\n", st->single_message_aircraft);
-    printf("%8u aircraft tracks which were not marked reliable\n", st->unreliable_aircraft);
+    printf("  %8u non-ES altitude messages from ES-equipped aircraft ignored\n", st->suppressed_altitude_messages);
+    printf("  %8u unique aircraft tracks\n", st->unique_aircraft);
+    printf("  %8u aircraft tracks where only one message was seen\n", st->single_message_aircraft);
+    printf("  %8u aircraft tracks which were not marked reliable\n", st->unreliable_aircraft);
 
     {
         uint64_t demod_cpu_millis = (uint64_t)st->demod_cpu.tv_sec*1000UL + st->demod_cpu.tv_nsec/1000000UL;
@@ -272,7 +315,14 @@ void add_stats(const struct stats *st1, const struct stats *st2, struct stats *t
     else
         target->start = st2->start;
 
-    target->end = st1->end > st2->end ? st1->end : st2->end;
+    const struct stats *newer;
+    if (st1->end > st2->end || (st1->end == st2->end && st1->start > st2->start)) {
+        newer = st1;
+    } else {
+        newer = st2;
+    }
+
+    target->end = newer->end;
 
     target->demod_preambles = st1->demod_preambles + st2->demod_preambles;
     target->demod_rejected_bad = st1->demod_rejected_bad + st2->demod_rejected_bad;
@@ -344,4 +394,24 @@ void add_stats(const struct stats *st1, const struct stats *st2, struct stats *t
     // range histogram
     for (i = 0; i < RANGE_BUCKET_COUNT; ++i)
         target->range_histogram[i] = st1->range_histogram[i] + st2->range_histogram[i];
+
+    // adaptive gain measurements
+
+    const struct stats *adaptive_best;
+    if (st1->adaptive_valid && st2->adaptive_valid)
+        adaptive_best = newer;
+    else if (st1->adaptive_valid)
+        adaptive_best = st1;
+    else
+        adaptive_best = st2;
+
+    target->adaptive_valid = adaptive_best->adaptive_valid;
+    target->adaptive_gain = adaptive_best->adaptive_gain;
+    for (unsigned i = 0; i < STATS_GAIN_COUNT; ++i)
+        target->adaptive_gain_seconds[i] = st1->adaptive_gain_seconds[i] + st2->adaptive_gain_seconds[i];
+    target->adaptive_loud_undecoded = st1->adaptive_loud_undecoded + st2->adaptive_loud_undecoded;
+    target->adaptive_loud_decoded = st1->adaptive_loud_decoded + st2->adaptive_loud_decoded;
+    target->adaptive_gain_changes = st1->adaptive_gain_changes + st2->adaptive_gain_changes;
+    target->adaptive_noise_dbfs = adaptive_best->adaptive_noise_dbfs;
+    target->adaptive_range_gain_limit = adaptive_best->adaptive_range_gain_limit;
 }
