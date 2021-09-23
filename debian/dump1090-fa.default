@@ -18,7 +18,7 @@ ADAPTIVE_DYNAMIC_RANGE=yes
 # Target dynamic range in dB (leave blank to autoselect based on SDR type)
 ADAPTIVE_DYNAMIC_RANGE_TARGET=
 # Reduce gain when loud message bursts from nearby aircraft are seen?
-ADAPTIVE_BURST=no
+ADAPTIVE_BURST=yes
 # Gain range to allow when changing gain, in dB (empty = no limit)
 ADAPTIVE_MIN_GAIN=
 ADAPTIVE_MAX_GAIN=
@@ -52,7 +52,7 @@ NET_BEAST_OUTPUT_PORTS=30005
 JSON_LOCATION_ACCURACY=1
 
 # Additional options can be added here:
-EXTRA_OPTIONS=""
+EXTRA_OPTIONS="--adaptive-burst-alpha 1 --adaptive-burst-change-delay 1 --adaptive-burst-loud-runlength 1 --adaptive-burst-quiet-runlength 1"
 
 # If OVERRIDE_OPTIONS is set, only those options are used; all other options
 # in this config file are ignored.
