@@ -52,7 +52,7 @@ NET_BEAST_OUTPUT_PORTS=30005
 JSON_LOCATION_ACCURACY=1
 
 # Additional options can be added here:
-EXTRA_OPTIONS="--adaptive-burst-alpha 1 --adaptive-burst-change-delay 1 --adaptive-burst-loud-runlength 1 --adaptive-burst-quiet-runlength 1"
+EXTRA_OPTIONS="--adaptive-burst-alpha 0.7 --adaptive-burst-change-delay 1 --adaptive-burst-loud-runlength 1 --adaptive-burst-quiet-runlength 5"
 
 # If OVERRIDE_OPTIONS is set, only those options are used; all other options
 # in this config file are ignored.
