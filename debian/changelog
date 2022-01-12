@@ -1,3 +1,21 @@
+dump1090-fa (7.1) stable; urgency=medium
+
+  * Preserve start/upgrade postinst logic for pre 7.1 updates until we support compat 10 behavior
+
+ -- Eric Tran <eric.tran@flightaware.com>  Wed, 12 Jan 2022 11:37:20 -0600
+
+dump1090-fa (7.0) stable; urgency=medium
+
+  * dump1090: Allow env vars (not only command line overrdies) to set CPU_FEATURES_{ARCH,UNAME}
+  * dump1090: Treat ARCH=arm64 like ARCH=aarch64
+  * dump1090: Try to respect CFLAGS/CPPFLAGS as far as possible; move required extra flags into a separate var
+  * dump1090: Adaptive gain - more aggressively re-probe for higher gain after a decrease in gain due to increased noise floor
+  * dump1090: Cleanup AVR parsing
+  * SkyAware: Update aircraft db to 20211210
+  * SkyAware: Cleanup unused Openlayers files
+
+ -- Eric Tran <eric.tran@flightaware.com>  Mon, 20 Dec 2021 11:00:00 -0600
+
 dump1090-fa (6.1) stable; urgency=medium
 
   * No-change 6.1 release for PiAware 6.1
