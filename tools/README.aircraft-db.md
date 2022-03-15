@@ -43,7 +43,7 @@ Additional CSV files can be given to `csv-to-json.py` if desired.
 
 The contents of public_html/db should be installed where the webmap can find
 them; the Debian packaging puts these in
-/usr/share/dump1090-fa/html/db
+/usr/share/skyaware/html/db
 
 The CSV format is very simple. The first line must be a header line that names
 the columns. These columns are understood:

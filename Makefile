@@ -4,7 +4,7 @@ DUMP1090_VERSION ?= unknown
 
 CFLAGS ?= -O3 -g
 DUMP1090_CFLAGS := -std=c11 -fno-common -Wall -Wmissing-declarations -Werror -W
-DUMP1090_CPPFLAGS := -I. -DMODES_DUMP1090_VERSION=\"$(DUMP1090_VERSION)\" -DMODES_DUMP1090_VARIANT=\"dump1090-fa\"
+DUMP1090_CPPFLAGS := -I. -D_POSIX_C_SOURCE=200112L -DMODES_DUMP1090_VERSION=\"$(DUMP1090_VERSION)\" -DMODES_DUMP1090_VARIANT=\"dump1090-fa\"
 
 LIBS = -lpthread -lm
 SDR_OBJ = cpu.o sdr.o fifo.o sdr_ifile.o dsp/helpers/tables.o
@@ -63,7 +63,7 @@ ifeq ($(UNAME), Darwin)
   LIBS_USB += -lusb-1.0
   LIBS_CURSES := -lncurses
   # cpufeatures reportedly does not work (yet) on darwin arm64
-  ifneq $($(ARCH),arm64)
+  ifneq ($(ARCH),arm64)
     CPUFEATURES ?= yes
   endif
 endif
