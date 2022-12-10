@@ -60,6 +60,9 @@ ifeq ($(UNAME), Darwin)
   endif
   DUMP1090_CPPFLAGS += -DMISSING_NANOSLEEP
   COMPAT += compat/clock_nanosleep/clock_nanosleep.o
+  ifeq ($(PKGCONFIG), yes)
+    LIBS_SDR += $(shell pkg-config --libs-only-L libusb-1.0)
+  endif
   LIBS_USB += -lusb-1.0
   LIBS_CURSES := -lncurses
   # cpufeatures reportedly does not work (yet) on darwin arm64
