@@ -33,6 +33,9 @@
 #ifdef ENABLE_LIMESDR
 #  include "sdr_limesdr.h"
 #endif
+#ifdef ENABLE_SOAPYSDR
+#  include "sdr_soapy.h"
+#endif
 
 typedef struct {
     const char *name;
@@ -127,6 +130,9 @@ static sdr_handler sdr_handlers[] = {
 #endif
 #ifdef ENABLE_LIMESDR
     { "limesdr", SDR_LIMESDR, limesdrInitConfig, limesdrShowHelp, limesdrHandleOption, limesdrOpen, limesdrRun, noStop, limesdrClose, noGetGain, noGetMaxGain, noGetGainDb, noSetGain },
+#endif
+#ifdef ENABLE_SOAPYSDR
+    { "soapy", SDR_SOAPYSDR, soapyInitConfig, soapyShowHelp, soapyHandleOption, soapyOpen, soapyRun, noStop, soapyClose, soapyGetGain, soapyGetMaxGain, soapyGetGainDb, soapySetGain },
 #endif
 
     { "none", SDR_NONE, noInitConfig, noShowHelp, noHandleOption, noOpen, noRun, noStop, noClose, noGetGain, noGetMaxGain, noGetGainDb, noSetGain },
