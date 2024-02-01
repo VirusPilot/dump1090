@@ -11,7 +11,7 @@ RECEIVER=rtlsdr
 RECEIVER_SERIAL=
 # Initial receiver gain, in dB. If adaptive gain is enabled (see below) the actual gain
 # may change over time
-RECEIVER_GAIN=50
+RECEIVER_GAIN=30
 
 # Adjust gain to try to achieve optimal dynamic range / noise floor?
 ADAPTIVE_DYNAMIC_RANGE=yes
@@ -21,7 +21,7 @@ ADAPTIVE_DYNAMIC_RANGE_TARGET=
 ADAPTIVE_BURST=yes
 # Gain range to allow when changing gain, in dB (empty = no limit)
 ADAPTIVE_MIN_GAIN=
-ADAPTIVE_MAX_GAIN=50
+ADAPTIVE_MAX_GAIN=30
 
 # Turn on options to reduce load on slower CPUs, at the expense of slightly worse decoder performance.
 # Setting "auto" will enable these options only if the CPU appears to be a slow CPU (currently this
@@ -39,7 +39,7 @@ ERROR_CORRECTION=yes
 RECEIVER_LAT=
 RECEIVER_LON=
 # Maximum range, in NM. Positions more distant than this are ignored. No limit if not set.
-MAX_RANGE=360
+MAX_RANGE=25
 
 # Network ports to listen on for connections
 NET_RAW_INPUT_PORTS=
@@ -52,7 +52,7 @@ NET_BEAST_OUTPUT_PORTS=30005
 JSON_LOCATION_ACCURACY=1
 
 # Additional options can be added here:
-EXTRA_OPTIONS="--adaptive-burst-alpha 0.7 --adaptive-burst-change-delay 1 --adaptive-burst-loud-runlength 1 --adaptive-burst-quiet-runlength 5"
+EXTRA_OPTIONS="--adaptive-burst-alpha 0.7 --adaptive-burst-change-delay 1 --adaptive-burst-loud-runlength 1 --adaptive-burst-quiet-runlength 5 --adaptive-range-change-delay 1"
 
 # If OVERRIDE_OPTIONS is set, only those options are used; all other options
 # in this config file are ignored.
