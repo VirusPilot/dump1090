@@ -39,7 +39,7 @@ ERROR_CORRECTION=yes
 RECEIVER_LAT=
 RECEIVER_LON=
 # Maximum range, in NM. Positions more distant than this are ignored. No limit if not set.
-MAX_RANGE=25
+MAX_RANGE=360
 
 # Network ports to listen on for connections
 NET_RAW_INPUT_PORTS=
