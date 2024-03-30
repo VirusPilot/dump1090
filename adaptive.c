@@ -449,13 +449,13 @@ void flush_stats(uint64_t now);
 
 static void adaptive_increase_gain(const char *why)
 {
-    if (adaptive_set_gain(sdrGetGain() + 1, why))
+    if (adaptive_set_gain(sdrGetGain() + 2, why))
         adaptive_gain_changed();
 }
 
 static void adaptive_decrease_gain(const char *why)
 {
-    if (adaptive_set_gain(sdrGetGain() - 1, why))
+    if (adaptive_set_gain(sdrGetGain() - 2, why))
         adaptive_gain_changed();
 }
 
