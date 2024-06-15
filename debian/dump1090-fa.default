@@ -11,7 +11,7 @@ RECEIVER=rtlsdr
 RECEIVER_SERIAL=
 # Initial receiver gain, in dB. If adaptive gain is enabled (see below) the actual gain
 # may change over time
-RECEIVER_GAIN=30
+RECEIVER_GAIN=60
 
 # Adjust gain to try to achieve optimal dynamic range / noise floor?
 ADAPTIVE_DYNAMIC_RANGE=yes
@@ -21,7 +21,7 @@ ADAPTIVE_DYNAMIC_RANGE_TARGET=
 ADAPTIVE_BURST=yes
 # Gain range to allow when changing gain, in dB (empty = no limit)
 ADAPTIVE_MIN_GAIN=
-ADAPTIVE_MAX_GAIN=30
+ADAPTIVE_MAX_GAIN=
 
 # Turn on options to reduce load on slower CPUs, at the expense of slightly worse decoder performance.
 # Setting "auto" will enable these options only if the CPU appears to be a slow CPU (currently this
