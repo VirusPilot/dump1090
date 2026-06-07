@@ -1,3 +1,13 @@
+dump1090-fa (11.0) stable; urgency=medium
+
+  * Add build support for trixie, remove buster support
+  * dump1090: update DSP code to use latest starch version
+  * dump1090: fix compilation errors with newer gcc & clang
+  * dump1090: add --device-setting option for SoapySDR devices
+  * skyaware: Update aircraft database to 2026-04-09
+
+ -- Oliver Jowett <oliver.jowett@flightaware.com>  Thu, 14 May 2026 21:30:41 +0800
+
 dump1090-fa (10.2) stable; urgency=medium
 
   * No change release for 10.2

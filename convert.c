@@ -31,15 +31,9 @@ static void convert_uc8(void *iq_data,
     const uc8_t *in = (const uc8_t *) iq_data;
 
     if (out_mean_level && out_mean_power) {
-        if (STARCH_IS_ALIGNED(in) && STARCH_IS_ALIGNED(mag_data))
-            starch_magnitude_power_uc8_aligned(in, mag_data, nsamples, out_mean_level, out_mean_power);
-        else
-            starch_magnitude_power_uc8(in, mag_data, nsamples, out_mean_level, out_mean_power);
+        starch_magnitude_power_uc8(in, mag_data, nsamples, out_mean_level, out_mean_power);
     } else {
-        if (STARCH_IS_ALIGNED(in) && STARCH_IS_ALIGNED(mag_data))
-            starch_magnitude_uc8_aligned(in, mag_data, nsamples);
-        else
-            starch_magnitude_uc8(in, mag_data, nsamples);
+        starch_magnitude_uc8(in, mag_data, nsamples);
     }
 }
 
@@ -54,16 +48,10 @@ static void convert_sc16(void *iq_data,
 
     const sc16_t *in = (const sc16_t *) iq_data;
 
-    if (STARCH_IS_ALIGNED(in) && STARCH_IS_ALIGNED(mag_data))
-        starch_magnitude_sc16_aligned(in, mag_data, nsamples);
-    else
-        starch_magnitude_sc16(in, mag_data, nsamples);
+    starch_magnitude_sc16(in, mag_data, nsamples);
 
     if (out_mean_level && out_mean_power) {
-        if (STARCH_IS_ALIGNED(mag_data))
-            starch_mean_power_u16_aligned(mag_data, nsamples, out_mean_level, out_mean_power);
-        else
-            starch_mean_power_u16(mag_data, nsamples, out_mean_level, out_mean_power);
+        starch_mean_power_u16(mag_data, nsamples, out_mean_level, out_mean_power);
     }
 }
 
@@ -78,16 +66,10 @@ static void convert_sc16q11(void *iq_data,
 
     const sc16_t *in = (const sc16_t *) iq_data;
 
-    if (STARCH_IS_ALIGNED(in) && STARCH_IS_ALIGNED(mag_data))
-        starch_magnitude_sc16q11_aligned(in, mag_data, nsamples);
-    else
-        starch_magnitude_sc16q11(in, mag_data, nsamples);
+    starch_magnitude_sc16q11(in, mag_data, nsamples);
 
     if (out_mean_level && out_mean_power) {
-        if (STARCH_IS_ALIGNED(mag_data))
-            starch_mean_power_u16_aligned(mag_data, nsamples, out_mean_level, out_mean_power);
-        else
-            starch_mean_power_u16(mag_data, nsamples, out_mean_level, out_mean_power);
+        starch_mean_power_u16(mag_data, nsamples, out_mean_level, out_mean_power);
     }
 }
 

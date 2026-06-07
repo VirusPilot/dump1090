@@ -18,9 +18,9 @@ The default data comes from a combination of:
 The VRS data was extracted by:
 
 ```sh
-$ wget http://www.virtualradarserver.co.uk/Files/BasicAircraftLookup.sqb.gz
-$ gunzip BasicAircraftLookup.sqb.gz
-$ tools/vrs-to-csv.py BasicAircraftLookup.sqb >tools/vrs.csv
+ wget http://www.virtualradarserver.co.uk/Files/BasicAircraftLookup.sqb.gz
+ gunzip BasicAircraftLookup.sqb.gz
+ tools/vrs-to-csv.py BasicAircraftLookup.sqb >tools/vrs.csv
 ```
 
 The FlightAware data is a subset of the registry information that FlightAware
@@ -33,10 +33,10 @@ are excluded from the export.
 To regenerate the json database from these input files:
 
 ```sh
-$ rm ../public_html/db/*.json
-$ xzcat vrs.csv.xz | nodejs ./filter-regs.js >vrs-filtered.csv
-$ xzcat flightaware-20231026.csv.xz | nodejs ./filter-regs.js >fa-filtered.csv
-$ ./csv-to-json.py vrs-filtered.csv fa-filtered.csv ../public_html/db
+ rm ../public_html/db/*.json
+ xzcat vrs.csv.xz | node ./filter-regs.js >vrs-filtered.csv
+ xzcat flightaware-20231026.csv.xz | node ./filter-regs.js >fa-filtered.csv
+ ./csv-to-json.py vrs-filtered.csv fa-filtered.csv ../public_html/db
 ```
 
 Additional CSV files can be given to `csv-to-json.py` if desired.

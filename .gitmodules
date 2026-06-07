@@ -1,0 +1,3 @@
+[submodule "starch"]
+	path = starch
+	url = https://github.com/flightaware/starch.git

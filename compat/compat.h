@@ -5,6 +5,14 @@
  * Platform-specific bits
  */
 
+#if defined(__clang__) && __clang_major__ >= 21
+#  define NONSTRING __attribute__((nonstring))
+#elif defined(__GNUC__) && __GNUC__ >= 10
+#  define NONSTRING __attribute__((nonstring))
+#else
+#  define NONSTRING /* nothing */
+#endif
+
 #if defined(__APPLE__)
 
 /*

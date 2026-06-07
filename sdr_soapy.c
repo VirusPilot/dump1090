@@ -40,6 +40,9 @@ static struct {
     int num_gain_elements;
     char **gain_elements;
 
+    unsigned num_settings;
+    char **settings;
+
     SoapySDRRange gain_range;
     int current_gain_step;
 } SOAPY;
@@ -88,6 +91,8 @@ void soapyInitConfig()
     SOAPY.enable_agc = false;
     SOAPY.num_gain_elements = 0;
     SOAPY.gain_elements = NULL;
+    SOAPY.num_settings = 0;
+    SOAPY.settings = NULL;
 }
 
 void soapyShowHelp()
@@ -100,6 +105,7 @@ void soapyShowHelp()
     printf("--bandwidth <hz>           set the baseband filter width (default: 3MHz, SDRPlay: 5MHz)\n");
     printf("--enable-agc               enable Automatic Gain Control if supported by device\n");
     printf("--gain-element <name>:<db> set gain in dB for a named gain element\n");
+    printf("--device-setting <k>=<v>   set device-specific setting\n");
     printf("\n");
 }
 
@@ -123,6 +129,16 @@ bool soapyHandleOption(int argc, char **argv, int *jptr)
             abort();
         }
         if (! (SOAPY.gain_elements[SOAPY.num_gain_elements-1] = strdup(argv[++j])) ) {
+            perror("strdup");
+            abort();
+        }
+    } else if (!strcmp(argv[j], "--device-setting") && more) {
+        ++SOAPY.num_settings;
+        if (! (SOAPY.settings = realloc(SOAPY.settings, SOAPY.num_settings * sizeof(*SOAPY.settings))) ) {
+            perror("realloc");
+            abort();
+        }
+        if (! (SOAPY.settings[SOAPY.num_settings-1] = strdup(argv[++j])) ) {
             perror("strdup");
             abort();
         }
@@ -229,6 +245,22 @@ bool soapyOpen(void)
     //
     // Configure everything
     //
+
+    // Device settings
+    for (unsigned i = 0; i < SOAPY.num_settings; ++i) {
+        char *element = SOAPY.settings[i];
+        char *sep = strchr(element, '=');
+        if (!sep || !sep[1]) {
+            fprintf(stderr, "soapy: don't understand a device setting of '%s' (should be formatted as <key>=<value>)\n", element);
+            goto error;
+        }
+        *sep = 0;
+
+        if (SoapySDRDevice_writeSetting(SOAPY.dev, element, sep+1) != 0) {
+            fprintf(stderr, "soapy: writeSetting(%s,%s) failed: %s\n", element, sep+1, SoapySDRDevice_lastError());
+            goto error;
+        }
+    }
 
     if (SOAPY.channel) {
         size_t supported_channels = SoapySDRDevice_getNumChannels(SOAPY.dev, SOAPY_SDR_RX);
@@ -517,6 +549,12 @@ void soapyClose()
     }
     free(SOAPY.gain_elements);
     SOAPY.gain_elements = NULL;
+
+    for (unsigned i = 0; i < SOAPY.num_settings; ++i) {
+        free(SOAPY.settings[i]);
+    }
+    free(SOAPY.settings);
+    SOAPY.settings = NULL;
 }
 
 //

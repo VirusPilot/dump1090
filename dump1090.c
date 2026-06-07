@@ -302,7 +302,6 @@ static void showDSP()
     printf("  selected DSP implementations: \n");
 #define SHOW(x) do {                                                    \
         printf("    %-40s %s\n", #x , starch_ ## x ## _select()->name);  \
-        printf("    %-40s %s\n", #x "_aligned", starch_ ## x ## _aligned_select()->name); \
     } while(0)
 
     SHOW(magnitude_uc8);
