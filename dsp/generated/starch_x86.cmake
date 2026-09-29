@@ -31,7 +31,7 @@ set_source_files_properties(dsp/generated/flavor.generic.c PROPERTIES COMPILE_OP
 
 macro(add_starch_library target)
   add_library(${target} ${ARGN} dsp/generated/flavor.x86_avx2.c dsp/generated/flavor.generic.c dsp/generated/dispatcher.c)
-  target_include_directories(${target} PUBLIC "dsp/generated")
+  target_include_directories(${target} PRIVATE "dsp/generated")
   target_compile_definitions(${target} PUBLIC "STARCH_MIX_X86")
 endmacro()
 

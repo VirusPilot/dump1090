@@ -1,3 +1,10 @@
+dump1090-fa (11.1) stable; urgency=medium
+
+  * generate-wisdom: don't try to benchmark removed _aligned variants
+  * Fix CPU feature detection for armhf binaries running on an aarch64 kernel
+
+ -- Eric Tran <eric.tran@flightaware.com>  Thu, 28 May 2026 17:16:34 +0000
+
 dump1090-fa (11.0) stable; urgency=medium
 
   * Add build support for trixie, remove buster support
